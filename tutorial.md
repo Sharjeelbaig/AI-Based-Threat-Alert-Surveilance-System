@@ -48,7 +48,7 @@ bun init
 ```
 Install the required dependencies:
 ```bash
-bun add dotenv @langchain/community @huggingface/transformers safe-text-to-json hono 
+bun add dotenv @langchain/community @huggingface/transformers safe-text-to-json kokoro-js hono 
 ```
 
 The folder structure for the backend will be based `features-based` architecture, which organizes code into distinct features or modules. Here's the proposed folder structure:
@@ -308,10 +308,10 @@ Now, let's implement the alert system feature using the `describeFrame` function
 Let's start with the `service.ts` file, where we will implement the core logic for analyzing image frames and generating alerts. Here's a basic implementation:
 ```typescript
 import { describeFrame } from "../../shared/utils/describe_frame";
-// We will import more utilities here later, like text-to-speech and generate alert function but for now let's focus on frame description.
+// We will import more utilities here later, like text-to-speech but for now let's focus on frame description.
 export async function analyzeFrame(imageBase64: string) {
   const frameDescription = await describeFrame(imageBase64);
-  // Further processing can be done here, such as tts and alert generation.
+  // Further processing can be done here for audio alert generation later.
   return frameDescription;
 }
 ```
@@ -380,4 +380,57 @@ I tested this api on Postman and it is working as expected.
 
 ### Audio Alert Generation
 
-We have successfully integrated the alert system feature into the main server application. but our alert system is like every other system, let's make it special by adding audio alert generation using a text-to-speech model, the 
+We have successfully integrated the alert system feature into the main server application. but our alert system is like every other system, let's make it special by adding audio alert generation using a text-to-speech model, the best model I think for this task is `onnx-community/Kokoro-82M-ONNX`. So let's add kokoro configuration in `src/config/kokoro.ts`:
+```typescript
+import { KokoroTTS } from "kokoro-js";
+
+const model_id = "onnx-community/Kokoro-82M-ONNX";
+export const tts = await KokoroTTS.from_pretrained(model_id);
+```
+
+The code is self-explanatory, so I think we can move forward to creating a utility function to convert text to speech using the TTS model. Create a file `convert_text_to_speech.ts` inside the `shared/utils` folder with the following code:
+```typescript
+import { tts } from "../../config/kokoro";
+
+export async function convertTextToSpeech(text: string){
+  const audio = await tts.generate(text, {
+    voice: "bm_george",
+  });
+  return audio;
+}
+```
+
+This function `convertTextToSpeech` takes a text string as input and uses the Kokoro TTS model to generate spoken audio. It specifies the voice to be used for the speech synthesis and returns the generated audio object. We can break down the function into three main steps:
+
+let's now update the `analyzeFrame` function in the `service.ts` file to include text-to-speech conversion and alert generation based on the frame description. Here's the updated implementation:
+```typescript
+import { describeFrame } from "../../shared/utils/describe_frame";
+import { convertTextToSpeech } from "../../shared/utils/convertTextToSpeech";
+
+export async function analyzeFrame(imageBase64: string) {
+  const frameDescription = await describeFrame(imageBase64);
+  
+  let audio = null;
+  if(frameDescription.isThreatening){
+    const alertText = `Alert! A potential threat has been detected The frame image description is as follows: ${frameDescription.description}`;
+    audio = (await convertTextToSpeech(alertText))?.audio
+  }
+  
+  return { frameDescription, audio };
+}
+```
+
+Ensure to update the `AnalyzeFrameResponse` interface in the `types.ts` file to include the alert audio:
+```typescript
+import type FrameDescription from "../../shared/types/frameDescription";
+export interface AnalyzeFrameRequest {
+  imageBase64: string;
+}
+export interface AnalyzeFrameResponse {
+  frameDescription: FrameDescription;
+  audio: Blob | null;
+}
+```
+
+
+

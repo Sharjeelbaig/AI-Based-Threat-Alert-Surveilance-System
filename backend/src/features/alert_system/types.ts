@@ -4,4 +4,5 @@ export interface AnalyzeFrameRequest {
 }
 export interface AnalyzeFrameResponse {
   frameDescription: FrameDescription;
+  alertAudio: Blob | null;
 }
