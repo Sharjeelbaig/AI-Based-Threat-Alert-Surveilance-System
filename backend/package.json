@@ -1,0 +1,17 @@
+{
+  "name": "backend",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@langchain/community": "^1.1.4",
+    "dotenv": "^17.2.3",
+    "hono": "^4.11.4",
+    "safe-text-to-json": "^1.0.0"
+  }
+}
