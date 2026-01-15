@@ -4,7 +4,7 @@ const API_BASE_URL = "http://localhost:3000"; // Backend runs on port 3000
 
 export interface FrameDescription {
   description: string;
-  isThreatening: boolean;
+  is_threat: boolean;
 }
 
 export interface AnalyzeFrameResponse {

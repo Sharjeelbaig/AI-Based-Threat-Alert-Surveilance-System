@@ -17,10 +17,10 @@ export async function describeFrame(imageBase64: string): Promise<FrameDescripti
 
   Rules:
   - description: factual description of visible content only
-  - is_threat: true only if a person appears to pose a physical threat.
+  - is_threat: true only if a person appears to hold a handgun, knife, or other weapon, or is showing aggressive body language even without additional context. Otherwise false.
   `;
   const userPrompt =
-    "<image>Describe the content of the image in detail. Tell if any person in the image is threatening or not" + forceJsonPrompt;
+    "<image>Describe the content of the image in detail. Tell if image is threatening based on the `Rules` provided. Remember any weapon or knife is ultimately considered a threat even without context. " + forceJsonPrompt;
   const messages = [{ role: "user", content: userPrompt }];
   const prompt = processor.apply_chat_template(messages, {
     add_generation_prompt: true,
@@ -45,7 +45,7 @@ export async function describeFrame(imageBase64: string): Promise<FrameDescripti
   });
 
   const decoded = processor.batch_decode(
-    outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
+    outputs?.slice(null, [inputs.input_ids.dims.at(-1), null]),
     { skip_special_tokens: true }
   );
   return safeJsonParse(decoded[0] as string) as FrameDescription;

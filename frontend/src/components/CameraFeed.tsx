@@ -73,7 +73,7 @@ export function CameraFeed() {
       const result = await analyzeFrame(frame);
       setLastAnalysis(result.frameDescription);
 
-      if (result.frameDescription.isThreatening) {
+      if (result?.frameDescription?.is_threat) {
         addLog(`⚠️ THREAT: ${result.frameDescription.description}`, "threat");
         if (result.audio) {
           playAudioAlert(result.audio);
@@ -163,7 +163,7 @@ export function CameraFeed() {
         )}
 
         {/* Threat Indicator */}
-        {lastAnalysis?.isThreatening && (
+        {lastAnalysis?.is_threat && (
           <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold animate-pulse shadow-lg">
             ⚠️ THREAT DETECTED
           </div>

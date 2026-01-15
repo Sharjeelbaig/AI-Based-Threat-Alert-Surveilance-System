@@ -1,4 +1,4 @@
 export default interface FrameDescription {
   description: string;
-  isThreatening: boolean;
+  is_threat: boolean;
 }

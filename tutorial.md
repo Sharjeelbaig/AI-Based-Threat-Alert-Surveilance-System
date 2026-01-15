@@ -280,7 +280,7 @@ To ensure type safety and clarity in our code, we will define a TypeScript inter
 ```typescript
 export default interface FrameDescription {
   description: string;
-  isThreatening: boolean;
+  is_threat: boolean;
 }
 ```
 I believe now you have a good understanding of how to use the vision model to describe image frames.
@@ -328,7 +328,7 @@ const alertSystemApp = new Hono();
 alertSystemApp.post("/", async (c) => {
   const { imageBase64 } = await c.req.json();
   const frameDescription = await analyzeFrame(imageBase64);
-  return c.json({ frameDescription });
+  return c.json(frameDescription);
 });
 
 export default alertSystemApp;
@@ -411,7 +411,7 @@ export async function analyzeFrame(imageBase64: string) {
   const frameDescription = await describeFrame(imageBase64);
   
   let audio = null;
-  if(frameDescription.isThreatening){
+  if(frameDescription?.is_threat){
     const alertText = `Alert! A potential threat has been detected The frame image description is as follows: ${frameDescription.description}`;
     audio = (await convertTextToSpeech(alertText))?.audio
   }
@@ -510,7 +510,7 @@ const API_BASE_URL = "http://localhost:3000"; // Backend runs on port 3000
 
 export interface FrameDescription {
   description: string;
-  isThreatening: boolean;
+  is_threat: boolean;
 }
 
 export interface AnalyzeFrameResponse {
@@ -612,7 +612,7 @@ export function CameraFeed() {
       const result = await analyzeFrame(frame);
       setLastAnalysis(result.frameDescription);
 
-      if (result.frameDescription.isThreatening) {
+      if (result?.frameDescription?.is_threat) {
         addLog(`⚠️ THREAT: ${result.frameDescription.description}`, "threat");
         if (result.audio) playAudioAlert(result.audio);
       } else {
@@ -668,7 +668,7 @@ export function CameraFeed() {
             Analyzing...
           </div>
         )}
-        {lastAnalysis?.isThreatening && (
+        {lastAnalysis?.is_threat && (
           <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold animate-pulse">
             ⚠️ THREAT DETECTED
           </div>
