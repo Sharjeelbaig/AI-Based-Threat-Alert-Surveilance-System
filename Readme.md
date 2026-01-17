@@ -1,8 +1,8 @@
 # S3 - Security Surveillance System
 Security Surveillance System (S3) is an AI-powered real-time threat detection and alert system that monitors camera feeds for potential threats using advanced vision and text-to-speech models.
-<div style="text-align: center;">
+<p align="center">
 <img src="./assets/s3-logo.png" alt="S3 Logo" width="450" />
-</div style="text-align: center;">
+</p>
 
 <p align="center">
   <b>🔐 AI-Powered Real-Time Threat Detection & Alert System</b>
