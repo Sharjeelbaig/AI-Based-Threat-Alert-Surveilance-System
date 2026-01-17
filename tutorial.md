@@ -56,7 +56,8 @@ The folder structure for the backend will be based `features-based` architecture
 backend/
 │ src/
 │ ├─ config/ # Configuration files of environment variables or individual libraries
-│ │  ├─ transformers.ts             
+│ │  ├─ transformers.ts     
+│ │  ├─ kokoro.ts             
 │ ├─ features/ # Each feature has its own folder
 │ │  └─ alert_system/
 │ │  │  ├─ controller.ts  # Controller to handle incoming requests
@@ -66,13 +67,9 @@ backend/
 │ │  └─ index.ts       # Entry point for all features
 │ ├─ shared/ # Shared resources across features
 │ │  ├─ types/ # Shared types
-│ │  │  └─ index.ts      #  Entry point for shared types
+│ │  │  └─ frameDescription.ts  # Type for frame description
 │ │  └─ utils/
-│ │     ├─ index.ts      # Entry point for shared utilities
-│ │     └─ response.ts    # Utility for standardizing API responses
 │ │     └─ describe_frame.ts    # Utility to describe image frames using the vision model
-│ │     └─ classify_threat.ts  # Utility to classify threats from descriptions
-│ │     └─ generate_alerting_text.ts  # Utility to generate alerting text using LLM
 │ │     └─ convert_text_to_speech.ts  # Utility to convert text to speech using TTS model
 │ └─ server.ts            # Main server file
 └─ .env                 # Environment variables
