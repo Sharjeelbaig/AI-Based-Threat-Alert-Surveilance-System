@@ -56,8 +56,7 @@ The folder structure for the backend will be based `features-based` architecture
 backend/
 │ src/
 │ ├─ config/ # Configuration files of environment variables or individual libraries
-│ │  ├─ transformers.ts       
-│ │  └─ env.ts          
+│ │  ├─ transformers.ts             
 │ ├─ features/ # Each feature has its own folder
 │ │  └─ alert_system/
 │ │  │  ├─ controller.ts  # Controller to handle incoming requests
@@ -412,8 +411,8 @@ export async function analyzeFrame(imageBase64: string) {
   
   let audio = null;
   if(frameDescription?.is_threat){
-    const alertText = `Alert! A potential threat has been detected The frame image description is as follows: ${frameDescription.description}`;
-    audio = (await convertTextToSpeech(alertText))?.audio
+    const alertText = `Alert! A potential threat has been detected The frame image description is as follows: ${frameDescription?.description}`;
+    audio = (await convertTextToSpeech(alertText))
   }
   
   return { frameDescription, audio };
@@ -435,22 +434,12 @@ export interface AnalyzeFrameResponse {
 Okay, now the backend of our Security Surveillance Threat Detection and Alert System is complete with audio alert generation. We need to quickly wrap up the frontend. So let's move on to the frontend implementation.
 
 ## Frontend Implementation
-Let's create a folder `frontend` and initialize a new Bun project inside it:
-```bash
-cd frontend
-bun init
-```
+First of all, It is worth to mention, I will not focus on frontend much to keep the tutorial simple and the main logic resides in the backend, also it gives bit flexibility for you to customize as you wish. so let's get started, first we need to create a folder for the frontend part of the application. Inside that folder we will run `bun init` and select React and typescript as our options. This will create a basic React application for us.
 
-You will be prompted to select a template, choose `react` from the list.
-And select `Tailwind CSS` when prompted.
-
-Our main goal for the frontend is to capture camera feed every 15 seconds ( you can adjust this interval as per your requirement and device capabilities ) and send the captured frame to the backend for analysis. If a threat is detected, we will play the generated audio alert.
-
-If you have initiated the the frontend project, bun creates some additional files for you, you can delete those, these files are:
+We should get rid of all the boilerplate files first so delete these files:
 - `src/APITester.tsx`
 - `src/react.svg`
-
-You also need to clean up the `src/index.css` file to remove unnecessary styles, you can replace the content of `src/index.css` with the following:
+and also clean up the `src/index.css` file to remove unnecessary styles, you can replace the content of `src/index.css` with the following:
 ```css
 @import "tailwindcss";
 ```
@@ -458,289 +447,25 @@ You also need to clean up the `src/index.css` file to remove unnecessary styles,
 Next, Make sure to install the required dependencies:
 
 ```bash
-bun add axios react-camera-pro
+bun add axios react-camera-pro play-pcm
 ```
+we should make sure our frontend runs on a different port, let's say port 3001. To do that, open index. and make sure it looks like this:
 
-Organize the frontend folder structure as follows:
-```bash
-frontend/
-│ src/
-│ ├─ components/ # Reusable UI components
-│ │  └─ CameraFeed.tsx  # Component to capture camera feed
-│ ├─ services/ # Services for API calls
-│ │  └─ alertSystemService.ts  # Service to interact with the alert system
-│ ├─ utils/ # Utilities
-│ │  └─ captureFrame.ts  # Utility to capture frame from camera
-│ ├─ App.tsx          # Main application component
-│ ├─ logo.svg       # Logo file
-│ ├─ frontend.tsx     # Frontend server configuration
-│ ├─ index.css        # Tailwind CSS styles
-│ ├─ index.ts        # Tailwind CSS styles
-│ └─ index.html      # HTML template
-└─ ... # Other configuration files
-```
-
-### Creating the Capture Frame Utility
-First, let's create a utility function to capture frames from the camera. Create `captureFrame.ts` in the `utils` folder:
-```typescript
-/**
- * Captures a frame from the camera and returns it as a base64 string.
- * @param takePhoto - Function from react-camera-pro to capture a photo
- * @returns Base64 encoded image string or null if capture fails
- */
-export function captureFrame(
-  takePhoto: () => string | ImageData | null
-): string | null {
-  const photo = takePhoto();
-  // react-camera-pro can return string (base64) or ImageData
-  if (typeof photo === "string") {
-    return photo;
-  }
-  return null;
-}
-```
-This utility wraps the `takePhoto` function from `react-camera-pro` and ensures we get a base64 string that can be sent to our backend.
-
-### Creating the Alert System Service
-Next, create the service to communicate with our backend API. Create `alertSystemService.ts` in the `services` folder:
-```typescript
-import axios from "axios";
-
-const API_BASE_URL = "http://localhost:3000"; // Backend runs on port 3000
-
-export interface FrameDescription {
-  description: string;
-  is_threat: boolean;
-}
-
-export interface AnalyzeFrameResponse {
-  frameDescription: FrameDescription;
-  audio: number[] | null; // Audio data as array of samples
-}
-
-/**
- * Sends a captured frame to the backend for threat analysis.
- * @param imageBase64 - Base64 encoded image string
- * @returns Analysis result including frame description and optional audio alert
- */
-export async function analyzeFrame(
-  imageBase64: string
-): Promise<AnalyzeFrameResponse> {
-  const response = await axios.post<AnalyzeFrameResponse>(
-    `${API_BASE_URL}/alert-system`,
-    { imageBase64 }
-  );
-  return response.data;
-}
-```
-This service:
-- Defines TypeScript interfaces matching our backend response types
-- Exports an `analyzeFrame` function that posts the captured frame to our backend
-- Returns the frame description and optional audio data for threat alerts
-
-### Creating the Camera Feed Component
-Now let's create the main camera component with a fullscreen UI and activity logs. Create `CameraFeed.tsx` in the `components` folder:
 ```tsx
-import { useRef, useState, useEffect, useCallback } from "react";
-import { Camera, type CameraType } from "react-camera-pro";
-import { captureFrame } from "../utils/captureFrame";
-import {
-  analyzeFrame,
-  type FrameDescription,
-} from "../services/alertSystemService";
-
-const CAPTURE_INTERVAL_MS = 15000; // 15 seconds
-
-interface LogEntry {
-  id: number;
-  timestamp: Date;
-  message: string;
-  type: "info" | "success" | "error" | "threat";
-}
-
-export function CameraFeed() {
-  const cameraRef = useRef<CameraType | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const [lastAnalysis, setLastAnalysis] = useState<FrameDescription | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const logIdRef = useRef(0);
-
-  // Add log entry
-  const addLog = useCallback((message: string, type: LogEntry["type"] = "info") => {
-    setLogs((prev) => [
-      { id: logIdRef.current++, timestamp: new Date(), message, type },
-      ...prev.slice(0, 49), // Keep last 50 logs
-    ]);
-  }, []);
-
-  // Play audio alert from audio data array
-  const playAudioAlert = useCallback((audioData: number[]) => {
-    try {
-      const audioContext = new AudioContext();
-      const audioBuffer = audioContext.createBuffer(1, audioData.length, audioContext.sampleRate);
-      const channelData = audioBuffer.getChannelData(0);
-      for (let i = 0; i < audioData.length; i++) {
-        channelData[i] = audioData[i] ?? 0;
-      }
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      source.start();
-      addLog("🔊 Playing audio alert", "threat");
-    } catch (err) {
-      addLog("Failed to play audio", "error");
-    }
-  }, [addLog]);
-
-  // Capture and analyze frame
-  const captureAndAnalyze = useCallback(async () => {
-    if (!cameraRef.current || isAnalyzing || !isCameraReady) return;
-
-    const takePhoto = () => cameraRef.current?.takePhoto() ?? null;
-    const frame = captureFrame(takePhoto);
-
-    if (!frame) {
-      addLog("Failed to capture frame", "error");
-      return;
-    }
-
-    setIsAnalyzing(true);
-    addLog("📸 Capturing frame for analysis...", "info");
-
-    try {
-      const result = await analyzeFrame(frame);
-      setLastAnalysis(result.frameDescription);
-
-      if (result?.frameDescription?.is_threat) {
-        addLog(`⚠️ THREAT: ${result.frameDescription.description}`, "threat");
-        if (result.audio) playAudioAlert(result.audio);
-      } else {
-        addLog(`✅ Safe: ${result.frameDescription.description.slice(0, 100)}...`, "success");
-      }
-    } catch (err) {
-      addLog(`❌ Error: ${err instanceof Error ? err.message : "Analysis failed"}`, "error");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [isAnalyzing, isCameraReady, playAudioAlert, addLog]);
-
-  // Auto-capture interval when camera is ready
-  useEffect(() => {
-    if (!isCameraReady) return;
-    addLog("🎥 Camera ready - Starting automatic monitoring", "success");
-    
-    const startDelay = setTimeout(() => captureAndAnalyze(), 2000);
-    const intervalId = setInterval(captureAndAnalyze, CAPTURE_INTERVAL_MS);
-    
-    return () => { clearTimeout(startDelay); clearInterval(intervalId); };
-  }, [isCameraReady, captureAndAnalyze]);
-
-  const formatTime = (date: Date) => date.toLocaleTimeString("en-US", {
-    hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
-
-  return (
-    <div className="fixed inset-0 bg-black flex flex-col">
-      {/* Fullscreen Camera View */}
-      <div className="flex-1 relative">
-        <Camera ref={cameraRef} aspectRatio="cover" errorMessages={{
-          noCameraAccessible: "No camera accessible. Please connect a camera.",
-          permissionDenied: "Camera permission denied. Please allow camera access.",
-          switchCamera: "Cannot switch camera", canvas: "Canvas error",
-        }} />
-
-        {/* Camera Ready Detection */}
-        <div className="absolute top-0 left-0 opacity-0 pointer-events-none">
-          <video autoPlay playsInline muted ref={(video) => {
-            if (video && !isCameraReady) {
-              navigator.mediaDevices.getUserMedia({ video: true })
-                .then(() => setIsCameraReady(true))
-                .catch(() => addLog("Camera permission denied", "error"));
-            }
-          }} />
-        </div>
-
-        {/* Status Overlays */}
-        {isAnalyzing && (
-          <div className="absolute top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-full flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Analyzing...
-          </div>
-        )}
-        {lastAnalysis?.is_threat && (
-          <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold animate-pulse">
-            ⚠️ THREAT DETECTED
-          </div>
-        )}
-        {!isCameraReady && (
-          <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-            <div className="text-white text-center">
-              <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-xl">Waiting for camera permission...</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Logs Panel */}
-      <div className="h-48 bg-gray-900 border-t border-gray-700 overflow-hidden">
-        <div className="px-4 py-2 bg-gray-800 border-b border-gray-700 flex justify-between">
-          <span className="text-gray-300 text-sm font-semibold">
-            📋 Activity Log {isCameraReady && <span className="text-green-400 ml-2">● Live</span>}
-          </span>
-          <span className="text-gray-500 text-xs">Auto-capture every {CAPTURE_INTERVAL_MS / 1000}s</span>
-        </div>
-        <div className="h-36 overflow-y-auto p-2 space-y-1 font-mono text-xs">
-          {logs.map((log) => (
-            <div key={log.id} className={`px-2 py-1 rounded ${
-              log.type === "threat" ? "bg-red-900/50 text-red-300" :
-              log.type === "error" ? "bg-red-900/30 text-red-400" :
-              log.type === "success" ? "bg-green-900/30 text-green-400" : "bg-gray-800/50 text-gray-400"
-            }`}>
-              <span className="text-gray-500">[{formatTime(log.timestamp)}]</span> {log.message}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default CameraFeed;
-```
-This component features:
-- **Fullscreen camera view** that covers the entire viewport
-- **Automatic monitoring** that starts once camera permission is granted
-- **Activity log panel** at the bottom showing all captures, results, and errors
-- **Audio alerts** played via Web Audio API when threats are detected
-- **Visual indicators** for analyzing state and threat detection
-
-### Updating the Main App Component
-The `App.tsx` is now minimal since CameraFeed handles everything:
-```tsx
-import "./index.css";
-import CameraFeed from "./components/CameraFeed";
-
-export function App() {
-  return <CameraFeed />;
-}
-
-export default App;
-```
-
-### Frontend Server Configuration
-The `index.ts` file configures Bun to serve our React app on port 3001 (to avoid conflict with the backend on port 3000):
-```typescript
 import { serve } from "bun";
 import index from "./index.html";
 
 const server = serve({
   routes: {
+    // Serve index.html for all unmatched routes.
     "/*": index,
   },
+
   development: process.env.NODE_ENV !== "production" && {
+    // Enable browser hot reloading in development
     hmr: true,
+
+    // Echo console logs from the browser to the server
     console: true,
   },
   port: 3001,
@@ -748,31 +473,156 @@ const server = serve({
 
 console.log(`🚀 Server running at ${server.url}`);
 ```
+The code above configures the Bun development server to listen on port 3001 instead of the default port, and also I cleaned up some routes that the boilerplate code had, so now we only have `/*` route and no any hello world route.
 
-### Running the Application
-To run the complete application:
+We should structure our `src` folder a bit better, so let's create the following folders inside `src`:
+- `components`
+- `services`
 
-1. **Start the backend** (in the `backend` folder):
-```bash
-cd backend
-bun run src/server.ts
+Now we can create our CameraFeed component inside the components folder. Create a new file called `CameraFeed.tsx` inside the `components` folder and add the following code:
+
+```tsx
+import React, { useRef } from "react";
+import { Camera, type CameraType } from "react-camera-pro";
+
+export function CameraFeed() {
+  const [audioPCMData, setAudioPCMData] = React.useState<Int16Array | null>(null);
+  const cameraRef = useRef<CameraType>(null);
+  
+  const handleCapture = async () => {
+    // to be implemented
+  }
+
+  return (
+    <div>
+       <Camera
+          ref={cameraRef}
+          aspectRatio="cover"
+          errorMessages={{
+            noCameraAccessible: "No camera accessible. Please connect a camera.",
+            permissionDenied: "Camera permission denied. Please allow camera access.",
+            switchCamera: "Cannot switch camera",
+            canvas: "Canvas error",
+          }}
+        />
+ 
+    </div>
+  );
+}
 ```
-The backend will start on `http://localhost:3000`.
+This component sets up the camera feed using the `react-camera-pro` library. We also set up a state variable to hold the audio PCM data that we will capture after implementing service.
+Next, we will implement the `alert` service to send api requests to the backend. Create a new file called `alert.ts` inside the `services` folder and add the following code:
 
-2. **Start the frontend** (in the `frontend` folder):
-```bash
-cd frontend
-bun run src/index.ts
+```tsx
+import axios from "axios";
+const API_URL = "http://localhost:3000"; 
+export async function sendAlert(imageData: string) {
+  try {
+    const response = await axios.post(`${API_URL}/alert-system`, {
+      imageBase64: imageData,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error sending alert:", error);
+    throw error;
+  }
+} 
 ```
-The frontend will start on `http://localhost:3001`.
+Now that we have created the service, we have to implement the `handleCapture` function inside the `CameraFeed` component to capture the image from the camera and send it to the backend using the `sendAlert` service. We will run the capture function every 5 seconds to continuously monitor the camera feed and to reduce the load on the backend as well because sending too many requests in a short period of time which includes inferencing language models can be expensive and slow down the system or may be dangerous in some cases. So we will use `setInterval` to run the capture function every 5 seconds. Update the `CameraFeed.tsx` file as follows:
 
-3. **Open the application** in your browser at `http://localhost:3001`.
+```tsx
+import React, { useEffect, useRef } from "react";
+import { Camera, type CameraType } from "react-camera-pro";
+import { sendAlert } from "@/services/alert";
+import { playPCM } from "play-pcm";
 
-4. **Grant camera permissions** when prompted by the browser.
+export function CameraFeed() {
+  const [loading, setLoading] = React.useState(false);
+  const [audioPCMData, setAudioPCMData] = React.useState<Float32Array | null>(
+    null,
+  );
+  const [threatDescription, setThreatDescription] = React.useState<string>("");
+  const cameraRef = useRef<CameraType>(null);
 
-5. **Monitoring starts automatically** once camera access is granted. The system will capture and analyze frames every 15 seconds.
+  const handleCapture = async () => {
+    if (cameraRef.current) {
+      setLoading(true);
+      const photo = cameraRef.current.takePhoto();
+      const response = await sendAlert(photo as string);
+      if (response) {
+        setLoading(false);
+        if (response.frameDescription?.is_threat) {
+          setThreatDescription(
+            `⚠️ THREAT DETECTED: ${response.frameDescription.description}`,
+          );
+        }
+        if (response.audio) {
+          setAudioPCMData(new Float32Array(Object?.values(response.audio)));
+        }
 
-The activity log at the bottom shows all captures, analysis results, and any errors. When a threat is detected, you'll see a red warning indicator on the camera feed and hear an audio alert.
+        console.log("Alert response:", response);
+      }
+    } else {
+      console.log("Capture in progress, skipping...");
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    const intervalId = setInterval(handleCapture, 5000); // Capture every 5 seconds
+    return () => clearInterval(intervalId);
+  }, [loading]);
+
+  useEffect(() => {
+    if (audioPCMData) {
+      playPCM(audioPCMData, { sampleRate: 16000, playbackRate: 1.6 });
+    }
+  }, [audioPCMData]);
+
+  return (
+    <div className="h-full w-full">
+      {loading  && (
+        <div className="z-10 p-4 absolute top-2 left-2 bg-black text-white rounded-md">
+          <p>Analyzing frame...</p>{" "}
+        </div>
+      ) }
+      {threatDescription &&
+      <div className="z-10 p-4 absolute top-18 left-2 bg-black text-white rounded-md">
+         <p>{threatDescription}</p>
+      </div>
+      }
+      <div className="h-full *:h-full">
+        <Camera
+          ref={cameraRef}
+          aspectRatio="cover"
+          errorMessages={{
+            noCameraAccessible:
+              "No camera accessible. Please connect a camera.",
+            permissionDenied:
+              "Camera permission denied. Please allow camera access.",
+            switchCamera: "Cannot switch camera",
+            canvas: "Canvas error",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+```
+Now let's add this component to our `App.tsx`:
+
+```tsx
+import {CameraFeed} from './components/CameraFeed'
+import "./index.css";
+
+export function App() {
+  return (
+    <CameraFeed />
+  );
+}
+
+export default App;
+```
 
 ## Conclusion
 Congratulations! You've built a complete Security Camera Threat Detection and Alert System using:

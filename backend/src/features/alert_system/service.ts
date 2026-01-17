@@ -6,8 +6,8 @@ export async function analyzeFrame(imageBase64: string) {
   
   let audio = null;
   if(frameDescription?.is_threat){
-    const alertText = `Alert! A potential threat has been detected The frame image description is as follows: ${frameDescription.description}`;
-    audio = (await convertTextToSpeech(alertText))?.audio
+    const alertText = `Alert! A potential threat has been detected The frame image description is as follows: ${frameDescription?.description}`;
+    audio = (await convertTextToSpeech(alertText))
   }
   
   return { frameDescription, audio };
