@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.shazi.s3",
   "build": {
-    "frontendDist": "../build",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:3001",
     "beforeDevCommand": "bun run dev",
     "beforeBuildCommand": "bun run build"
