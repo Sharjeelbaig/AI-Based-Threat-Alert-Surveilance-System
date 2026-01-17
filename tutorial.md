@@ -32,8 +32,7 @@ I tried to keep the tutorial as simple as possible. These terms will help you un
 - [hono](https://honojs.dev/): A lightweight and fast web framework
 - [axios](https://axios-http.com/): A promise-based HTTP client for the browser and Node.js
 - [transformers.js](https://xenova.github.io/transformers.js/): A JavaScript library for running transformer models in the browser and Node.js
-- [@langchain/community](https://js.langchain.com/docs/getting-started/installation/): Community-maintained LangChain integrations and tools. LangChain is a framework for developing applications powered by language models.
-- [dotenv](https://www.npmjs.com/package/dotenv): A zero-dependency module that loads environment variables from a `.env` file into `process.env`
+
 ### Frontend
 - [axios](https://axios-http.com/): A promise-based HTTP client for the browser
 - [React](https://react.dev/): A JavaScript library for building user interfaces
@@ -48,7 +47,7 @@ bun init
 ```
 Install the required dependencies:
 ```bash
-bun add dotenv @langchain/community @huggingface/transformers safe-text-to-json kokoro-js hono 
+bun add @huggingface/transformers safe-text-to-json kokoro-js hono 
 ```
 
 The folder structure for the backend will be based on a `features-based` architecture, which organizes code into distinct features or modules. Here's the proposed folder structure:
@@ -71,7 +70,6 @@ backend/
 │ │     ├─ describe_frame.ts    # Utility to describe image frames using the vision model
 │ │     └─ convertTextToSpeech.ts  # Utility to convert text to speech using TTS model
 │ └─ server.ts            # Main server file
-└─ .env                 # Environment variables
 ```
 
 ### Creating a transformers configuration file
@@ -679,7 +677,7 @@ Now that we have both the frontend and backend ready, let's run the application!
 Open a terminal, navigate to the `backend` folder, and run:
 ```bash
 cd backend
-bun run src/server.ts
+bun run src/server.ts # we can also create a script in package.json for this  
 ```
 
 The backend will start on `http://localhost:3000`. Note that the first time you run it, it will download the AI models which may take a few minutes depending on your internet connection.
@@ -688,7 +686,7 @@ The backend will start on `http://localhost:3000`. Note that the first time you 
 Open another terminal, navigate to the `frontend` folder, and run:
 ```bash
 cd frontend
-bun run src/index.ts
+bun run dev
 ```
 
 The frontend will start on `http://localhost:3001`. Open this URL in your browser, allow camera access when prompted, and the system will start analyzing your camera feed every 5 seconds for potential threats.
