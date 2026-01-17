@@ -9,6 +9,7 @@
     "build": "bun run build.ts"
   },
   "dependencies": {
+    "@tauri-apps/cli": "^2.9.6",
     "axios": "^1.13.2",
     "bun-plugin-tailwind": "^0.1.2",
     "play-pcm": "^1.0.3",

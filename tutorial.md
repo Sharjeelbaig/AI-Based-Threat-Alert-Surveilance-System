@@ -693,405 +693,247 @@ The frontend will start on `http://localhost:3001`. Open this URL in your browse
 
 ## Frontend Implementation (desktop-app)
 
-Now that we have the web-based frontend working, let's create a native desktop application using **Tauri**. Tauri allows us to build lightweight, secure desktop applications using web technologies while providing native OS integration. This is perfect for a security monitoring application that needs to run reliably in the background.
+While our web-based frontend works great in the browser, there's something incredibly satisfying about having a dedicated native desktop application for security monitoring. A native app can sit in your dock/taskbar, start automatically when your computer boots, and provide a more focused experience without browser tabs getting in the way.
 
-### Creating the Tauri Project
+The good news? We don't need to build a completely separate application! **Tauri** allows us to wrap our existing React frontend into a lightweight, secure native desktop application. Think of it as putting your web app in a native shell—same code, native experience.
 
-First, let's create a new Tauri project. Open a terminal in the `intruder alert` folder and run:
+### Why Tauri?
 
-```bash
-bun create tauri-app
-```
+Before we dive in, let's understand why Tauri is perfect for this use case:
 
-When prompted, configure the project with these options:
-- **Project name**: `frontend-app` (we'll rename the folder to `frontend-desktop-app`)
-- **Identifier**: Choose your preferred identifier (e.g., `com.intruderalert.app`)
-- **Frontend language**: TypeScript / JavaScript
-- **Package manager**: bun
-- **UI template**: React
-- **UI flavor**: TypeScript
+- 🪶 **Lightweight**: Unlike Electron, Tauri apps are typically under 10MB because they use the system's native webview
+- 🔒 **Secure**: Built with Rust, it provides memory safety and security by default
+- ⚡ **Fast**: Native performance with minimal resource overhead
+- 🔧 **Easy Integration**: Can be added to any existing web project with minimal changes
 
-After creation, rename the folder from `frontend-app` to `frontend-desktop-app`:
+### Installing the Tauri CLI
+
+First, let's add the Tauri CLI as a development dependency to our existing frontend project. Open a terminal, navigate to the `frontend` folder, and run:
 
 ```bash
-mv frontend-app frontend-desktop-app
-cd frontend-desktop-app
+cd frontend
+bun install --save-dev @tauri-apps/cli
 ```
 
-### Installing Dependencies
+This installs the Tauri CLI locally in your project, which is the recommended approach as it ensures everyone working on the project uses the same version.
 
-Navigate to the `frontend-desktop-app` folder and install the base dependencies along with the additional packages we need:
+### Initializing Tauri in Your Project
+
+Now comes the exciting part—transforming our web app into a desktop app! Run the Tauri initialization command:
 
 ```bash
-cd frontend-desktop-app
-bun install
-bun add axios react-camera-pro
+npx tauri init
 ```
 
-> **Note**: Unlike the web frontend, we won't use `play-pcm` here. Instead, we'll leverage Tauri's native audio capabilities or use the Web Audio API directly.
+You'll be prompted with a series of questions. Here's what to enter:
 
-### Project Structure
+1. **What is your app name?** → Enter your preferred name (e.g., `s3` or `intruder-alert`)
 
-Let's set up the proper folder structure. Create the following folders inside `src`:
-- `components`
-- `services`
+2. **What should the window title be?** → Something descriptive like `S3 - Security Surveillance System`
 
-```bash
-mkdir -p src/components src/services
+3. **Where are your web assets located?** → `../build` (this is where Bun outputs the built files)
+
+4. **What is the url of your dev server?** → `http://localhost:3001` (our frontend dev server port)
+
+5. **What is your frontend dev command?** → `bun run dev`
+
+6. **What is your frontend build command?** → `bun run build`
+
+After answering these questions, Tauri will create a `src-tauri` folder in your frontend directory with the following structure:
+
+```
+frontend/
+├── src/
+│   └── ... (your existing React code)
+├── src-tauri/
+│   ├── src/
+│   │   ├── main.rs          # Rust entry point
+│   │   └── lib.rs           # Rust library code
+│   ├── icons/               # App icons for all platforms
+│   ├── tauri.conf.json      # Tauri configuration
+│   ├── Cargo.toml           # Rust dependencies
+│   └── build.rs             # Build script
+└── package.json
 ```
 
-### Creating the Alert Service
+### Understanding the Tauri Configuration
 
-Create a new file `src/services/alert.ts` to handle API communication with the backend:
-
-```typescript
-import axios from "axios";
-
-const API_URL = "http://localhost:3000";
-
-export async function sendAlert(imageData: string) {
-  try {
-    const response = await axios.post(`${API_URL}/alert-system`, {
-      imageBase64: imageData,
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error sending alert:", error);
-    throw error;
-  }
-}
-```
-
-This service is identical to our web frontend service since both communicate with the same backend API.
-
-### Creating the CameraFeed Component
-
-Create a new file `src/components/CameraFeed.tsx` with the camera feed and threat detection logic:
-
-```tsx
-import React, { useEffect, useRef } from "react";
-import { Camera, type CameraType } from "react-camera-pro";
-import { sendAlert } from "../services/alert";
-
-export function CameraFeed() {
-  const [loading, setLoading] = React.useState(false);
-  const [audioPCMData, setAudioPCMData] = React.useState<Float32Array | null>(
-    null,
-  );
-  const [threatDescription, setThreatDescription] = React.useState<string>("");
-  const cameraRef = useRef<CameraType>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-
-  const playAudioFromPCM = (pcmData: Float32Array) => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
-    }
-    const audioContext = audioContextRef.current;
-    const sampleRate = 24000;
-    const audioBuffer = audioContext.createBuffer(1, pcmData.length, sampleRate);
-    audioBuffer.getChannelData(0).set(pcmData);
-    
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.playbackRate.value = 1.6;
-    source.connect(audioContext.destination);
-    source.start();
-  };
-
-  const handleCapture = async () => {
-    if (cameraRef.current && !loading) {
-      setLoading(true);
-      try {
-        const photo = cameraRef.current.takePhoto();
-        const response = await sendAlert(photo as string);
-        if (response) {
-          if (response.frameDescription?.is_threat) {
-            setThreatDescription(
-              `⚠️ THREAT DETECTED: ${response.frameDescription.description}`,
-            );
-          } else {
-            setThreatDescription("");
-          }
-          if (response.audio) {
-            const audioData = new Float32Array(Object.values(response.audio));
-            setAudioPCMData(audioData);
-          }
-          console.log("Alert response:", response);
-        }
-      } catch (error) {
-        console.error("Error capturing frame:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (loading) return;
-    const intervalId = setInterval(handleCapture, 5000);
-    return () => clearInterval(intervalId);
-  }, [loading]);
-
-  useEffect(() => {
-    if (audioPCMData) {
-      playAudioFromPCM(audioPCMData);
-    }
-  }, [audioPCMData]);
-
-  return (
-    <div className="camera-container">
-      {loading && (
-        <div className="status-overlay analyzing">
-          <p>🔍 Analyzing frame...</p>
-        </div>
-      )}
-      {threatDescription && (
-        <div className="status-overlay threat">
-          <p>{threatDescription}</p>
-        </div>
-      )}
-      <div className="camera-wrapper">
-        <Camera
-          ref={cameraRef}
-          aspectRatio="cover"
-          errorMessages={{
-            noCameraAccessible:
-              "No camera accessible. Please connect a camera.",
-            permissionDenied:
-              "Camera permission denied. Please allow camera access.",
-            switchCamera: "Cannot switch camera",
-            canvas: "Canvas error",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-```
-
-The main difference from the web version is that we use the native Web Audio API instead of the `play-pcm` library, which provides better compatibility with Tauri's webview.
-
-### Updating App.tsx
-
-Replace the contents of `src/App.tsx` with our security camera application:
-
-```tsx
-import { CameraFeed } from "./components/CameraFeed";
-import "./App.css";
-
-function App() {
-  return (
-    <div className="app">
-      <header className="app-header">
-        <h1>🔒 Intruder Alert System</h1>
-        <p>Desktop Security Monitor</p>
-      </header>
-      <main className="app-main">
-        <CameraFeed />
-      </main>
-    </div>
-  );
-}
-
-export default App;
-```
-
-### Styling the Application
-
-Replace the contents of `src/App.css` with styles optimized for the security monitoring interface:
-
-```css
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #f6f6f6;
-  background-color: #1a1a2e;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body, #root {
-  height: 100%;
-  width: 100%;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-}
-
-.app-header {
-  background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
-  padding: 1rem 2rem;
-  border-bottom: 1px solid #0f3460;
-  text-align: center;
-}
-
-.app-header h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
-  color: #e94560;
-}
-
-.app-header p {
-  font-size: 0.875rem;
-  color: #a0a0a0;
-}
-
-.app-main {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.camera-container {
-  height: 100%;
-  width: 100%;
-  position: relative;
-}
-
-.camera-wrapper {
-  height: 100%;
-  width: 100%;
-}
-
-.camera-wrapper > div {
-  height: 100% !important;
-}
-
-.status-overlay {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 10;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-weight: 500;
-  max-width: calc(100% - 2rem);
-}
-
-.status-overlay.analyzing {
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid #4a4a4a;
-}
-
-.status-overlay.threat {
-  background: rgba(233, 69, 96, 0.9);
-  border: 1px solid #e94560;
-  top: 4rem;
-}
-
-.status-overlay p {
-  margin: 0;
-  word-wrap: break-word;
-}
-```
-
-### Configuring Tauri for Camera Access
-
-Tauri requires proper permissions for camera access. The default configuration should work, but let's verify the `src-tauri/tauri.conf.json` has the security settings we need:
+Let's take a look at the generated `src-tauri/tauri.conf.json`. This is the heart of your Tauri configuration:
 
 ```json
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Intruder Alert",
+  "productName": "S3 - Security Surveillance System",
   "version": "0.1.0",
-  "identifier": "com.intruderalert.app",
+  "identifier": "com.s3.security",
   "build": {
     "beforeDevCommand": "bun run dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:3001",
     "beforeBuildCommand": "bun run build",
-    "frontendDist": "../dist"
+    "frontendDist": "../build"
   },
   "app": {
     "windows": [
       {
-        "title": "Intruder Alert - Security Monitor",
+        "title": "S3 - Security Surveillance System",
         "width": 1024,
-        "height": 768,
-        "resizable": true,
-        "fullscreen": false
+        "height": 768
       }
     ],
     "security": {
       "csp": null
     }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
   }
 }
 ```
 
-The key settings here are:
-- `"csp": null` - Disables Content Security Policy to allow camera access and API calls
-- Window size set to `1024x768` for better visibility of the camera feed
-- Updated title to reflect our application name
+Let's break down the important parts:
+
+- **`productName`**: The name that appears in the app's title bar and system menus
+- **`identifier`**: A unique identifier for your app (reverse domain notation)
+- **`beforeDevCommand`**: The command Tauri runs to start your dev server
+- **`devUrl`**: Where your dev server is running
+- **`beforeBuildCommand`**: The command to build your frontend for production
+- **`frontendDist`**: Where the built files are located
+- **`csp: null`**: Disables Content Security Policy to allow camera access and API calls (important for our use case!)
+
+Feel free to adjust the window dimensions. For a security monitoring app, you might want a larger default size like `1280x720` for better camera feed visibility.
+
+### Installing Tauri Dependencies
+
+Before we can run the desktop app, we need to install the Tauri Rust dependencies. Tauri will handle this automatically when you first run the app, but make sure you have Rust installed on your system:
+
+```bash
+# If you don't have Rust installed, install it first:
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
 ### Running the Desktop Application
 
-Now we can run the desktop application! Make sure the backend is running first, then:
+Now for the moment of truth! Make sure your backend is running first (in a separate terminal), then start the desktop app:
 
 ```bash
-cd frontend-desktop-app
+# In the frontend folder
 bun run tauri dev
 ```
 
-The first time you run this, Tauri will compile the Rust backend which may take a few minutes. Subsequent runs will be much faster.
+The first time you run this command, Tauri will:
+1. Download and compile all Rust dependencies (this takes a few minutes)
+2. Start your frontend dev server
+3. Open a native window with your app running inside
 
-You should see a native desktop window open with the camera feed. The application will:
-1. Request camera permission on first launch
-2. Capture frames every 5 seconds
-3. Send frames to the backend for threat analysis
-4. Display threat alerts and play audio warnings when threats are detected
+> **☕ Grab a coffee!** The first compilation can take 2-5 minutes depending on your machine. Subsequent runs will be much faster thanks to caching.
+
+Once compiled, you'll see a native desktop window open with your Security Surveillance System! The camera feed should work just like in the browser, and threat detection alerts will appear as expected.
+
+### Enhancing the Desktop Experience
+
+Now that we have a working desktop app, let's make a few enhancements to improve the native experience.
+
+#### Updating the Window Configuration
+
+Open `src-tauri/tauri.conf.json` and update the window configuration for a better security monitoring experience:
+
+```json
+{
+  "app": {
+    "windows": [
+      {
+        "title": "S3 - Security Surveillance System",
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
+```
+
+The new settings:
+- **`center: true`**: Opens the window in the center of the screen
+- **`decorations: true`**: Shows the native window title bar and controls
+- **`resizable: true`**: Allows users to resize the window
 
 ### Building for Production
 
-To create a production build of the desktop application:
+When you're ready to distribute your app, building for production is straightforward:
 
 ```bash
 bun run tauri build
 ```
 
-This will create platform-specific installers in `src-tauri/target/release/bundle/`:
-- **macOS**: `.dmg` and `.app` files
-- **Windows**: `.msi` and `.exe` installers
-- **Linux**: `.deb`, `.rpm`, and `.AppImage` files
+This command will:
+1. Build your React frontend for production
+2. Compile the Rust backend in release mode
+3. Bundle everything into platform-specific installers
 
-### Desktop vs Web Frontend Comparison
+The output will be in `src-tauri/target/release/bundle/`:
+
+| Platform | Output Files |
+|----------|-------------|
+| **macOS** | `.dmg` installer and `.app` bundle |
+| **Windows** | `.msi` installer and `.exe` |
+| **Linux** | `.deb`, `.rpm`, and `.AppImage` |
+
+### Adding Scripts to package.json
+
+For convenience, add these scripts to your `frontend/package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "build": "bun run build.ts",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  }
+}
+```
+
+Now you can simply run:
+- `bun run tauri:dev` - Start the desktop app in development mode
+- `bun run tauri:build` - Build the production installer
+
+### Desktop vs Web: When to Use Which?
 
 | Feature | Web Frontend | Desktop App |
 |---------|-------------|-------------|
-| Distribution | Browser URL | Native installer |
-| Camera Access | Browser permissions | OS-level permissions |
-| Audio Playback | `play-pcm` library | Web Audio API |
-| Performance | Browser overhead | Native performance |
-| Offline Capable | No | Yes (with local backend) |
-| System Tray | No | Possible with Tauri |
+| **Distribution** | Share a URL | Install native app |
+| **Camera Access** | Browser permissions | OS-level permissions |
+| **Performance** | Browser overhead | Native performance |
+| **Startup** | Open browser + navigate | Double-click app icon |
+| **Background Running** | Tab must stay open | Runs independently |
+| **System Integration** | Limited | Full (tray, notifications, etc.) |
+| **Offline Capable** | No | Yes (with local backend) |
 
-The desktop application provides a more native experience and can be extended with system tray support, notifications, and auto-start capabilities using Tauri's plugin system.
+For a security monitoring application, the desktop app provides significant advantages:
+- **Reliability**: No accidental tab closures
+- **Quick Access**: Dedicated app in your dock/taskbar
+- **Professional Feel**: Looks like dedicated security software
+- **Future Features**: Easy to add system tray support, auto-start on boot, etc.
+
+### Troubleshooting Common Issues
+
+**Camera not working in Tauri?**
+- Make sure `"csp": null` is set in your Tauri config
+- On macOS, you may need to grant camera permissions in System Preferences
+
+**Build fails with Rust errors?**
+- Ensure Rust is up to date: `rustup update`
+- Try cleaning the build: `cd src-tauri && cargo clean`
+
+**App window is blank?**
+- Check that your dev server is running on the correct port
+- Verify `devUrl` in `tauri.conf.json` matches your server URL
+
+Congratulations! 🎉 You've successfully converted your web-based security monitoring system into a native desktop application. The same React code now runs as both a web app and a desktop app—the best of both worlds!
 
 ## Conclusion
 Congratulations! You've built a complete Security Camera Threat Detection and Alert System using:

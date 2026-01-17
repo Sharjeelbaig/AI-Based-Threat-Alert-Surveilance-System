@@ -8,6 +8,7 @@
   <img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/Tauri-24C8D8?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri">
   <img src="https://img.shields.io/badge/Hono-E36002?style=for-the-badge&logo=hono&logoColor=white" alt="Hono">
   <img src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Hugging Face">
 </p>
@@ -95,6 +96,10 @@ S3/
 │   │   │   └── alert.ts                 # Backend API client
 │   │   ├── index.html
 │   │   └── index.css                    # Tailwind styles
+│   ├── src-tauri/                       # Tauri desktop app (optional)
+│   │   ├── src/                         # Rust source files
+│   │   ├── tauri.conf.json              # Tauri configuration
+│   │   └── Cargo.toml                   # Rust dependencies
 │   ├── build.ts
 │   └── package.json
 │
@@ -150,6 +155,25 @@ S3/
    The app will be available at `http://localhost:3001` (or similar)
 
 3. **Allow Camera Access** when prompted in your browser
+
+### 🖥️ Running as Desktop App (Optional)
+
+Want a native desktop experience? The frontend can be wrapped with Tauri:
+
+```bash
+cd frontend
+
+# Install Tauri CLI (first time only)
+bun install --save-dev @tauri-apps/cli
+
+# Initialize Tauri (first time only)
+npx tauri init
+
+# Run desktop app
+bun run tauri dev
+```
+
+> **Note**: First run compiles Rust and takes 2-5 minutes. See [frontend/README.md](frontend/README.md) for detailed setup.
 
 ---
 
@@ -245,6 +269,7 @@ const intervalId = setInterval(handleCapture, 5000); // Adjust as needed
 | **react-camera-pro** | Camera access |
 | **play-pcm** | Audio playback |
 | **Axios** | HTTP client |
+| **Tauri** | Desktop app wrapper (optional) |
 
 ---
 
