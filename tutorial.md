@@ -1,23 +1,23 @@
 # Security Camera Threat Detection and Alert System
-Hello! I just learned apple has released it's new vision model called FastVLM-0.5B.
+Hello! I just learned Apple has released its new vision model called FastVLM-0.5B.
 I tested it, and found out they added the word "Fast" for a reason. It's blazing fast and accurate for vision tasks, so I decided to build a security camera threat detection and alert system using this model.
 The system will analyze camera feeds for potential threats, and if a threat is detected, it will generate a voice alert using a text-to-speech model.
-I along with the development of this project also documented the steps I took to build it. And thought it would be helpful to share it as a tutorial for others who might be interested in building similar systems.
+Along with the development of this project, I also documented the steps I took to build it and thought it would be helpful to share it as a tutorial for others who might be interested in building similar systems.
 ## Prerequisites
 - Basic knowledge of TypeScript and Bun runtime.
-- Very basic understanding of how LLMs work ( not mandatory, as I will try my best to explain the necessary concepts along the way).
+- Very basic understanding of how LLMs work (not mandatory, as I will try my best to explain the necessary concepts along the way).
 - Bun installed on your machine. You can follow the instructions [here](https://bun.sh/docs/installation).
 
 ## Terms Used
 - `LLM`: Large Language Model
 - `ImageTextToTextModel`: A model that takes image and text as input and generates text as output.
 - `Text-to-Speech Model`: A model that converts text input into spoken audio output.
-- `ONNX`: Open Neural Network Exchange, a format for representing machine learning models, this format allows models to be used in transformers.js library, other similar formats are safeTensors, GGUF etc.
+- `ONNX`: Open Neural Network Exchange, a format for representing machine learning models. This format allows models to be used in the transformers.js library. Other similar formats include SafeTensors, GGUF, etc.
 - `Decoder`: A component that converts the model's output tokens into human-readable text.
 - `Input Preprocessing and Output Postprocessing`: The steps taken to prepare input data for the model and to process the model's output into a usable format.
 - `Processor`: A component that handles input preprocessing and output postprocessing for the model.
 - `Tokenizer`: A component that converts text into tokens that the model can understand, and vice versa.
-- `Blob`: A binary large object that represents raw data e.g an image or audio etc, often used to handle file-like objects in applications.
+- `Blob`: A binary large object that represents raw data, e.g., an image or audio, often used to handle file-like objects in applications.
 - `base64`: A method for encoding binary data (like images or audio) into a text format, making it easier to transmit over text-based protocols.
 - `Inference`: The process of using a trained machine learning model to make predictions or generate outputs based on new input data.
 - `Generation`: The process of producing new data (like text or audio) using a machine learning model.
@@ -25,14 +25,14 @@ I along with the development of this project also documented the steps I took to
 - `embed_tokens`: The numerical representation of tokens that the model uses for processing.
 - `quantization`: A technique used to reduce the size of machine learning models by converting weights and activations from higher precision (like float32) to lower precision (like int8 or int4), which helps in faster inference and reduced memory usage.
 
-I tried to keep the tutorial as simple as possible, these terms will help you understand the concepts and don't worry if you don't understand them fully right now, Follow along the tutorial, it may become clearer as we progress.
+I tried to keep the tutorial as simple as possible. These terms will help you understand the concepts, and don't worry if you don't understand them fully right now. Follow along with the tutorial; it may become clearer as we progress.
 
 ## Dependencies Used
 ### Backend
 - [hono](https://honojs.dev/): A lightweight and fast web framework
 - [axios](https://axios-http.com/): A promise-based HTTP client for the browser and Node.js
 - [transformers.js](https://xenova.github.io/transformers.js/): A JavaScript library for running transformer models in the browser and Node.js
-- [@langchain/community](https://js.langchain.com/docs/getting-started/installation/): Community maintained LangChain integrations and tools, Langchain is a framework for developing applications powered by language models.
+- [@langchain/community](https://js.langchain.com/docs/getting-started/installation/): Community-maintained LangChain integrations and tools. LangChain is a framework for developing applications powered by language models.
 - [dotenv](https://www.npmjs.com/package/dotenv): A zero-dependency module that loads environment variables from a `.env` file into `process.env`
 ### Frontend
 - [axios](https://axios-http.com/): A promise-based HTTP client for the browser
@@ -51,32 +51,31 @@ Install the required dependencies:
 bun add dotenv @langchain/community @huggingface/transformers safe-text-to-json kokoro-js hono 
 ```
 
-The folder structure for the backend will be based `features-based` architecture, which organizes code into distinct features or modules. Here's the proposed folder structure:
+The folder structure for the backend will be based on a `features-based` architecture, which organizes code into distinct features or modules. Here's the proposed folder structure:
 ```bash
 backend/
 │ src/
-│ ├─ config/ # Configuration files of environment variables or individual libraries
+│ ├─ config/ # Configuration files for individual libraries
 │ │  ├─ transformers.ts     
-│ │  ├─ kokoro.ts             
+│ │  └─ kokoro.ts             
 │ ├─ features/ # Each feature has its own folder
 │ │  └─ alert_system/
-│ │  │  ├─ controller.ts  # Controller to handle incoming requests
-│ │  │  ├─ service.ts     # Service to implement business logic
-│ │  │  ├─ types.ts       # Types specific to this feature
-│ │  │  └─ index.ts       # Entry point for the feature
-│ │  └─ index.ts       # Entry point for all features
+│ │     ├─ controller.ts  # Controller to handle incoming requests
+│ │     ├─ service.ts     # Service to implement business logic
+│ │     ├─ types.ts       # Types specific to this feature
+│ │     └─ index.ts       # Entry point for the feature
 │ ├─ shared/ # Shared resources across features
 │ │  ├─ types/ # Shared types
 │ │  │  └─ frameDescription.ts  # Type for frame description
 │ │  └─ utils/
-│ │     └─ describe_frame.ts    # Utility to describe image frames using the vision model
-│ │     └─ convert_text_to_speech.ts  # Utility to convert text to speech using TTS model
+│ │     ├─ describe_frame.ts    # Utility to describe image frames using the vision model
+│ │     └─ convertTextToSpeech.ts  # Utility to convert text to speech using TTS model
 │ └─ server.ts            # Main server file
 └─ .env                 # Environment variables
 ```
 
 ### Creating a transformers configuration file
-So transformers is a library that enables us to run transformer models in JavaScript, it is provided by Hugging Face, a popular platform for machine learning models. We will configure and export the vision model and processor now, as the first feature we are going to implement is image threat classification using the vision model. The transformers library provides easy access to pre-trained models and processors from Hugging Face, the hub for machine learning models, datasets, and more (I know I am repeating things here, just for ensuring we stay on the same page). So will create a `transformers.ts` file inside the `config` folder with the following code:
+So transformers is a library that enables us to run transformer models in JavaScript, it is provided by Hugging Face, a popular platform for machine learning models. We will configure and export the vision model and processor now, as the first feature we are going to implement is image threat classification using the vision model. The transformers library provides easy access to pre-trained models and processors from Hugging Face, the hub for machine learning models, datasets, and more (I know I am repeating things here, just for ensuring we stay on the same page). So we will create a `transformers.ts` file inside the `config` folder with the following code:
 ```typescript
 import {
   AutoModelForImageTextToText,
@@ -137,76 +136,103 @@ Finally, we export an object `vision_config` that contains both the loaded model
 
 
 ### Creating a utility function to describe image frames
-Next, we will create a utility function that will use the vision model to describe image. We are creating it to get the description of each frame from the camera feed, which will then be analyzed for potential threats. Create a file `describe_frame.ts` inside the `shared/utils` folder with the following code:
+Next, we will create a utility function that will use the vision model to describe an image. We are creating it to get the description of each frame from the camera feed, which will then be analyzed for potential threats. Create a file `describe_frame.ts` inside the `shared/utils` folder with the following code:
 ```typescript
+import safeJsonParse from "safe-text-to-json";
 import { vision_config } from "../../config/transformers";
 import { RawImage } from "@huggingface/transformers";
-import safeJsonParse from "safe-text-to-json";
+import type FrameDescription from "../types/frameDescription";
 
-export async function describeFrame(imageBase64: string) {
+export async function describeFrame(imageBase64: string): Promise<FrameDescription> {
   const { model, processor } = vision_config;
+  const forceJsonPrompt = `
+  You MUST output ONLY valid JSON.
+  No explanation, no markdown.
+
+  JSON schema:
+  {
+    "description": string,
+    "is_threat": boolean
+  }
+
+  Rules:
+  - description: factual description of visible content only
+  - is_threat: true if a person appears to hold a handgun, knife, or other weapon. Otherwise false.
+
+  Threat criteria:
+  - Any person holding a weapon (gun, knife, etc.) is a threat.
+  - Any person making threatening gestures with visible weapons is a threat.
+  - Any person holding a weapon even if the pose is non-threatening is still a threat.
+  `;
   const userPrompt =
-    "<image>Describe the content of the image in detail. Tell if any person in the image is threatening or not";
+    "<image>Describe the content of the image in detail. Tell if image is threatening based on the \`Threat criteria\` provided. Remember any weapon or knife is ultimately considered a threat even without context. " + forceJsonPrompt;
   const messages = [{ role: "user", content: userPrompt }];
   const prompt = processor.apply_chat_template(messages, {
     add_generation_prompt: true,
   });
-  
+
   const imageBlob = await fetch(imageBase64)
     .then((res) => res.blob())
     .then((blob) => {
       return blob;
     });
 
-  const image = await RawImage.fromBlob(imageBlob)
+  const image = await RawImage.fromBlob(imageBlob);
   const inputs = await processor(image, prompt, {
     add_special_tokens: false,
   });
 
   // Generate output
-  const outputs = await model.generate({
+  const outputs: any = await model.generate({
     ...inputs,
-    max_new_tokens: 512,
+    max_new_tokens: 2048,
     do_sample: false,
   });
 
   const decoded = processor.batch_decode(
-    outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
+    outputs?.slice(null, [inputs.input_ids.dims.at(-1), null]),
     { skip_special_tokens: true }
   );
-  return safeJsonParse(decoded[0] as string);
+  return safeJsonParse(decoded[0] as string) as FrameDescription;
 }
 ```
-This function `describeFrame` takes an image in base64 format as input and returns a detailed description of the image using the vision model. It constructs a prompt asking the model to describe the content of the image and determine if any person in the image is threatening. The function processes the image and prompt, generates a response using the model, and decodes the output to return the final description as a string. We can break down the function into eight main steps:
-1. getting the model and processor from the `vision_config`.
+This function `describeFrame` takes an image in base64 format as input and returns a detailed description of the image using the vision model. It constructs a prompt asking the model to describe the content of the image and determine if any person in the image is threatening. The function processes the image and prompt, generates a response using the model, and decodes the output to return the final description as a JSON object. We can break down the function into eight main steps:
+
+1. Getting the model and processor from the `vision_config`.
 ```ts
-    const { model, processor } = vision_config;
+const { model, processor } = vision_config;
 ```
-2. Constructing a prompt that instructs the model to describe the image in detail and identify any threatening individuals and output in JSON format.
+
+2. Constructing a prompt that instructs the model to describe the image in detail, identify any threatening individuals, and output the result in JSON format.
 ```ts
-    const forceJsonPrompt = `
-    You MUST output ONLY valid JSON.
-    No explanation, no markdown.
+const forceJsonPrompt = `
+You MUST output ONLY valid JSON.
+No explanation, no markdown.
 
-    JSON schema:
-    {
-      "description": string,
-      "is_threat": boolean
-    }
+JSON schema:
+{
+  "description": string,
+  "is_threat": boolean
+}
 
-    Rules:
-    - description: factual description of visible content only
-    - is_threat: true only if a person appears to pose a physical threat.
-    `;
-    const userPrompt =
-    "<image>Describe the content of the image in detail. Tell if any person in the image is threatening or not " + forceJsonPrompt;
-    const messages = [{ role: "user", content: userPrompt }];
-    const prompt = processor.apply_chat_template(messages, {
-    add_generation_prompt: true,
-    });
+Rules:
+- description: factual description of visible content only
+- is_threat: true if a person appears to hold a handgun, knife, or other weapon. Otherwise false.
+
+Threat criteria:
+- Any person holding a weapon (gun, knife, etc.) is a threat.
+- Any person making threatening gestures with visible weapons is a threat.
+- Any person holding a weapon even if the pose is non-threatening is still a threat.
+`;
+const userPrompt =
+  "<image>Describe the content of the image in detail. Tell if image is threatening based on the \`Threat criteria\` provided. Remember any weapon or knife is ultimately considered a threat even without context. " + forceJsonPrompt;
+const messages = [{ role: "user", content: userPrompt }];
+const prompt = processor.apply_chat_template(messages, {
+  add_generation_prompt: true,
+});
 ```
 - `<image>` is a special token used to indicate where the image input should be placed in the prompt for the model to understand that it needs to analyze the image content.
-- `messages` is an array that simulates a chat-like interaction, where the user provides the prompt, llms are often designed to handle conversational inputs and our prompt is structured in a way that mimics a user message in a chat. it contains a single user message with the prompt. Used to guide the model's response in a way that it identifies what user has asked for or what I have responded with so far. Consider it as a conversation history. In our case, we only have one message from the user, but we could add more messages if needed, even from the assistant (LLM) role.
+- `messages` is an array that simulates a chat-like interaction where the user provides the prompt. LLMs are often designed to handle conversational inputs, and our prompt is structured in a way that mimics a user message in a chat. It contains a single user message with the prompt. This is used to guide the model's response in a way that identifies what the user has asked for or what the assistant has responded with so far. Consider it as a conversation history. In our case, we only have one message from the user, but we could add more messages if needed, even from the assistant (LLM) role.
 - `apply_chat_template` is a method provided by the processor to format the messages into a chat-like structure that the model can understand, adding any necessary generation prompts.
 
 3. Converting the base64 image string into a Blob object for processing.
@@ -244,32 +270,32 @@ This function `describeFrame` takes an image in base64 format as input and retur
 
 6. Generating the model's output based on the processed inputs, specifying parameters like maximum new tokens and sampling method.
 ```ts
-    const outputs = await model.generate({
-    ...inputs,
-    max_new_tokens: 512,
-    do_sample: false,
-    });
+const outputs: any = await model.generate({
+  ...inputs,
+  max_new_tokens: 2048,
+  do_sample: false,
+});
 ```
 - `generate` is a method used to produce output from the model based on the provided inputs.
-- `max_new_tokens: 512`: This parameter sets the maximum number of new tokens that the model can generate in response to the input. In this case, it is limited to 512 tokens.
+- `max_new_tokens: 2048`: This parameter sets the maximum number of new tokens that the model can generate in response to the input. In this case, it is limited to 2048 tokens.
 - `do_sample: false`: This parameter indicates that the model should not use sampling when generating output. Instead, it will use a deterministic approach (like greedy decoding) to produce the most likely next tokens.
 
 7. Decoding the model's output tokens into human-readable text, skipping any special tokens.
 ```ts
-    const decoded = processor.batch_decode(
-    outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
-    { skip_special_tokens: true }
-    );
+const decoded = processor.batch_decode(
+  outputs?.slice(null, [inputs.input_ids.dims.at(-1), null]),
+  { skip_special_tokens: true }
+);
 ```
 - `batch_decode` is a method provided by the processor to convert the model's output tokens back into human-readable text.
-- `outputs.slice(null, [inputs.input_ids.dims.at(-1), null])`: This line slices the output tokens to only include the newly generated tokens, excluding the input tokens.
+- `outputs?.slice(null, [inputs.input_ids.dims.at(-1), null])`: This line slices the output tokens to only include the newly generated tokens, excluding the input tokens.
 - `skip_special_tokens: true`: This option tells the decoder to ignore any special tokens (like padding or start/end tokens) when converting the tokens back to text, ensuring that the final output is clean and readable.
 
 8. Returning the parsed JSON object containing the description and threat assessment.
 ```ts
-    return safeJsonParse(decoded[0] as string);
+return safeJsonParse(decoded[0] as string) as FrameDescription;
 ```
-- Finally, we return the first element of the `decoded` array, which contains the detailed description of the image generated by the model. But before returning, we parse it using `safeJsonParse` to convert the string into a JSON object, which allows us to easily access the description and threat assessment in a structured format.
+- Finally, we return the first element of the `decoded` array, which contains the detailed description of the image generated by the model. But before returning, we parse it using `safeJsonParse` to convert the string into a JSON object and cast it as `FrameDescription`, which allows us to easily access the description and threat assessment in a structured format with proper type safety.
 
 ### Ensuring Type Safety with FrameDescription Interface
 To ensure type safety and clarity in our code, we will define a TypeScript interface for the frame description returned by the `describeFrame` function. This interface will specify the expected structure of the description object, which includes a textual description and a boolean indicating whether a threat is present. Create a file `frameDescription.ts` inside the `shared/types` folder with the following code:
@@ -281,15 +307,7 @@ export default interface FrameDescription {
 ```
 I believe now you have a good understanding of how to use the vision model to describe image frames.
 
-Make sure to add this type in the `describeFrame` function return type for better type safety:
-```ts
-...
-...
-export async function describeFrame(imageBase64: string): Promise<FrameDescription> {
-...
-return safeJsonParse(decoded[0] as string) as FrameDescription
-}
-```
+> **Note:** We already included the `FrameDescription` type import and return type in the full `describeFrame` function code above, so you should be all set!
 
 ### Feature Implementation
 Now that we have the utility function to describe image frames, we can proceed to implement the alert system feature. This feature will utilize the `describeFrame` function to analyze camera feeds for potential threats. So before that I would like to confirm why we created separate utility functions instead of implementing everything directly. In a feature-based architecture, creating separate utility functions offers modularity, reusability, maintainability, testability, and separation of concerns, which are essential for building scalable and efficient applications.
@@ -344,7 +362,7 @@ export interface AnalyzeFrameResponse {
 
 We created two interfaces here:
 - `AnalyzeFrameRequest`: This interface defines the structure of the request object for analyzing a frame, which includes a single property `imageBase64` of type `string`. This property represents the base64-encoded image that will be analyzed for threats.
-- `AnalyzeFrameResponse`: Although we can use the `FrameDescription` type directly, but to maintain consistency and clarity, we defined this interface to represent the structure of the response object returned after analyzing a frame. It contains a single property `frameDescription` of type `FrameDescription`, which holds the detailed description of the analyzed image frame, including whether a threat was detected.
+- `AnalyzeFrameResponse`: Although we could use the `FrameDescription` type directly, to maintain consistency and clarity, we defined this interface to represent the structure of the response object returned after analyzing a frame. It contains a single property `frameDescription` of type `FrameDescription`, which holds the detailed description of the analyzed image frame, including whether a threat was detected.
 
 Finally, we will create an `index.ts` file to serve as the entry point for the alert system feature:
 ```typescript
@@ -352,7 +370,8 @@ import alertSystemApp from "./controller";
 export default alertSystemApp;
 ```
 This file simply imports the `alertSystemApp` from the controller and exports it as the default export, making it easy to integrate the alert system feature into the main server application.
-Generally, when programmers uses `index.ts` even though mainly re-exporting modules, it provides a centralized entry point for the feature or module, simplifies imports in other parts of the application, enhances organization and maintainability, and allows for easier scalability as the feature grows. We can also do this step for shared types and utils as well. So You can figure that out, you just have to create `index.ts` in the `shared/types` and `shared/utils` folders and re-export everything from there, utilizing barrel export pattern, So I will leave that up to you as an exercise for `feature-based` architecture understanding, Otherwise, you can just import the required modules directly without creating `index.ts` files.
+
+Generally, when programmers use `index.ts` (even though it's mainly re-exporting modules), it provides a centralized entry point for the feature or module, simplifies imports in other parts of the application, enhances organization and maintainability, and allows for easier scalability as the feature grows. We can also do this step for shared types and utils as well. You can figure that out—you just have to create `index.ts` in the `shared/types` and `shared/utils` folders and re-export everything from there, utilizing the barrel export pattern. I will leave that up to you as an exercise for `feature-based` architecture understanding. Otherwise, you can just import the required modules directly without creating `index.ts` files.
 
 ### Integrating the Alert System Feature into the Main Server
 Now that we have implemented the alert system feature, we need to integrate it into the main server application. Open the `server.ts` file in the `src` folder and modify it as follows:
@@ -371,34 +390,39 @@ export default app;
 ```
 In this code, we import the `alertSystemApp` from the alert system feature and set up a route `/alert-system` to handle requests related to the alert system. We also add CORS middleware to allow cross-origin requests, which is essential for frontend-backend communication.
 
-I tested this api on Postman and it is working as expected.
+I tested this API on Postman and it is working as expected.
 ![Test](/assets/test.png)
 
 ### Audio Alert Generation
 
-We have successfully integrated the alert system feature into the main server application. but our alert system is like every other system, let's make it special by adding audio alert generation using a text-to-speech model, the best model I think for this task is `onnx-community/Kokoro-82M-ONNX`. So let's add kokoro configuration in `src/config/kokoro.ts`:
+We have successfully integrated the alert system feature into the main server application, but our alert system is like every other system. Let's make it special by adding audio alert generation using a text-to-speech model. The best model I think for this task is `onnx-community/Kokoro-82M-ONNX`. So let's add the Kokoro configuration in `src/config/kokoro.ts`:
 ```typescript
 import { KokoroTTS } from "kokoro-js";
 
 const model_id = "onnx-community/Kokoro-82M-ONNX";
-export const tts = await KokoroTTS.from_pretrained(model_id);
+export const tts = await KokoroTTS.from_pretrained(model_id, {
+  device: "cpu",
+  dtype: "fp16",
+});
 ```
 
-The code is self-explanatory, so I think we can move forward to creating a utility function to convert text to speech using the TTS model. Create a file `convert_text_to_speech.ts` inside the `shared/utils` folder with the following code:
+This code imports the `KokoroTTS` class from the `kokoro-js` library and initializes the TTS model with the specified model ID. We also set the `device` to "cpu" and `dtype` to "fp16" for consistent performance across different machines.
+
+Now let's create a utility function to convert text to speech using the TTS model. Create a file `convertTextToSpeech.ts` inside the `shared/utils` folder with the following code:
 ```typescript
 import { tts } from "../../config/kokoro";
 
-export async function convertTextToSpeech(text: string){
-  const audio = await tts.generate(text, {
+export async function convertTextToSpeech(text: string): Promise<Float32Array> {
+  const { audio } = await tts.generate(text, {
     voice: "bm_george",
   });
   return audio;
 }
 ```
 
-This function `convertTextToSpeech` takes a text string as input and uses the Kokoro TTS model to generate spoken audio. It specifies the voice to be used for the speech synthesis and returns the generated audio object. We can break down the function into three main steps:
+This function `convertTextToSpeech` takes a text string as input and uses the Kokoro TTS model to generate spoken audio. It specifies the voice to be used for the speech synthesis (`bm_george`) and returns the generated audio as a `Float32Array`. The function destructures the `audio` property from the result since `tts.generate` returns an object containing the audio data.
 
-let's now update the `analyzeFrame` function in the `service.ts` file to include text-to-speech conversion and alert generation based on the frame description. Here's the updated implementation:
+Let's now update the `analyzeFrame` function in the `service.ts` file to include text-to-speech conversion and alert generation based on the frame description. Here's the updated implementation:
 ```typescript
 import { describeFrame } from "../../shared/utils/describe_frame";
 import { convertTextToSpeech } from "../../shared/utils/convertTextToSpeech";
@@ -416,37 +440,59 @@ export async function analyzeFrame(imageBase64: string) {
 }
 ```
 
-Ensure to update the `AnalyzeFrameResponse` interface in the `types.ts` file to include the alert audio:
+Ensure you also update the controller to return both the frame description and audio. Update `controller.ts`:
+```typescript
+import { Hono } from "hono";
+import { analyzeFrame } from "./service";
+
+const alertSystemApp = new Hono();
+
+alertSystemApp.post("/", async (c) => {
+  const { imageBase64 } = await c.req.json();
+  const { frameDescription, audio } = await analyzeFrame(imageBase64);
+  return c.json({ frameDescription, audio });
+});
+
+export default alertSystemApp;
+```
+
+Also update the `AnalyzeFrameResponse` interface in the `types.ts` file to include the audio:
 ```typescript
 import type FrameDescription from "../../shared/types/frameDescription";
+
 export interface AnalyzeFrameRequest {
   imageBase64: string;
 }
+
 export interface AnalyzeFrameResponse {
   frameDescription: FrameDescription;
-  audio: Blob | null;
+  audio: Float32Array | null;
 }
 ```
 
 Okay, now the backend of our Security Surveillance Threat Detection and Alert System is complete with audio alert generation. We need to quickly wrap up the frontend. So let's move on to the frontend implementation.
 
 ## Frontend Implementation
-First of all, It is worth to mention, I will not focus on frontend much to keep the tutorial simple and the main logic resides in the backend, also it gives bit flexibility for you to customize as you wish. so let's get started, first we need to create a folder for the frontend part of the application. Inside that folder we will run `bun init` and select React and typescript as our options. This will create a basic React application for us.
+First of all, it is worth mentioning that I will not focus on the frontend much to keep the tutorial simple since the main logic resides in the backend. This also gives you some flexibility to customize it as you wish. So let's get started!
 
-We should get rid of all the boilerplate files first so delete these files:
+First, we need to create a folder for the frontend part of the application. Inside that folder, we will run `bun init` and select React and TypeScript as our options. This will create a basic React application for us.
+
+We should get rid of all the boilerplate files first, so delete these files:
 - `src/APITester.tsx`
 - `src/react.svg`
-and also clean up the `src/index.css` file to remove unnecessary styles, you can replace the content of `src/index.css` with the following:
+
+Also, clean up the `src/index.css` file to remove unnecessary styles. You can replace the content of `src/index.css` with the following:
 ```css
 @import "tailwindcss";
 ```
 
-Next, Make sure to install the required dependencies:
+Next, make sure to install the required dependencies:
 
 ```bash
 bun add axios react-camera-pro play-pcm
 ```
-we should make sure our frontend runs on a different port, let's say port 3001. To do that, open index. and make sure it looks like this:
+
+We should make sure our frontend runs on a different port, let's say port 3001. To do that, open `index.ts` and make sure it looks like this:
 
 ```tsx
 import { serve } from "bun";
@@ -470,7 +516,7 @@ const server = serve({
 
 console.log(`🚀 Server running at ${server.url}`);
 ```
-The code above configures the Bun development server to listen on port 3001 instead of the default port, and also I cleaned up some routes that the boilerplate code had, so now we only have `/*` route and no any hello world route.
+The code above configures the Bun development server to listen on port 3001 instead of the default port. I also cleaned up some routes that the boilerplate code had, so now we only have the `/*` route and no "hello world" route.
 
 We should structure our `src` folder a bit better, so let's create the following folders inside `src`:
 - `components`
@@ -483,7 +529,7 @@ import React, { useRef } from "react";
 import { Camera, type CameraType } from "react-camera-pro";
 
 export function CameraFeed() {
-  const [audioPCMData, setAudioPCMData] = React.useState<Int16Array | null>(null);
+  const [audioPCMData, setAudioPCMData] = React.useState<Float32Array | null>(null);
   const cameraRef = useRef<CameraType>(null);
   
   const handleCapture = async () => {
@@ -507,12 +553,15 @@ export function CameraFeed() {
   );
 }
 ```
-This component sets up the camera feed using the `react-camera-pro` library. We also set up a state variable to hold the audio PCM data that we will capture after implementing service.
-Next, we will implement the `alert` service to send api requests to the backend. Create a new file called `alert.ts` inside the `services` folder and add the following code:
+This component sets up the camera feed using the `react-camera-pro` library. We also set up a state variable to hold the audio PCM data that we will receive after implementing the alert service.
 
-```tsx
+Next, we will implement the `alert` service to send API requests to the backend. Create a new file called `alert.ts` inside the `services` folder and add the following code:
+
+```typescript
 import axios from "axios";
+
 const API_URL = "http://localhost:3000"; 
+
 export async function sendAlert(imageData: string) {
   try {
     const response = await axios.post(`${API_URL}/alert-system`, {
@@ -525,7 +574,8 @@ export async function sendAlert(imageData: string) {
   }
 } 
 ```
-Now that we have created the service, we have to implement the `handleCapture` function inside the `CameraFeed` component to capture the image from the camera and send it to the backend using the `sendAlert` service. We will run the capture function every 5 seconds to continuously monitor the camera feed and to reduce the load on the backend as well because sending too many requests in a short period of time which includes inferencing language models can be expensive and slow down the system or may be dangerous in some cases. So we will use `setInterval` to run the capture function every 5 seconds. Update the `CameraFeed.tsx` file as follows:
+
+Now that we have created the service, we need to implement the `handleCapture` function inside the `CameraFeed` component to capture the image from the camera and send it to the backend using the `sendAlert` service. We will run the capture function every 5 seconds to continuously monitor the camera feed and reduce the load on the backend. Sending too many requests in a short period of time, which includes inferencing language models, can be expensive and slow down the system or may even be dangerous in some cases. So we will use `setInterval` to run the capture function every 5 seconds. Update the `CameraFeed.tsx` file as follows:
 
 ```tsx
 import React, { useEffect, useRef } from "react";
@@ -609,7 +659,7 @@ export function CameraFeed() {
 Now let's add this component to our `App.tsx`:
 
 ```tsx
-import {CameraFeed} from './components/CameraFeed'
+import { CameraFeed } from './components/CameraFeed'
 import "./index.css";
 
 export function App() {
@@ -621,6 +671,28 @@ export function App() {
 export default App;
 ```
 
+## Running the Application
+
+Now that we have both the frontend and backend ready, let's run the application!
+
+### Start the Backend
+Open a terminal, navigate to the `backend` folder, and run:
+```bash
+cd backend
+bun run src/server.ts
+```
+
+The backend will start on `http://localhost:3000`. Note that the first time you run it, it will download the AI models which may take a few minutes depending on your internet connection.
+
+### Start the Frontend
+Open another terminal, navigate to the `frontend` folder, and run:
+```bash
+cd frontend
+bun run src/index.ts
+```
+
+The frontend will start on `http://localhost:3001`. Open this URL in your browser, allow camera access when prompted, and the system will start analyzing your camera feed every 5 seconds for potential threats.
+
 ## Conclusion
 Congratulations! You've built a complete Security Camera Threat Detection and Alert System using:
 - **Apple's FastVLM-0.5B** for fast and accurate image analysis
@@ -631,3 +703,16 @@ Congratulations! You've built a complete Security Camera Threat Detection and Al
 
 This system demonstrates how modern AI models can be integrated into practical applications for real-time threat detection and alerting.
 
+### Key Takeaways
+1. **Local AI Inference**: Running AI models locally with transformers.js provides privacy and reduces latency.
+2. **Feature-Based Architecture**: Organizing code by features improves maintainability and scalability.
+3. **Real-Time Processing**: Using intervals for camera capture balances responsiveness with system load.
+4. **Type Safety**: TypeScript interfaces ensure consistent data structures across the application.
+
+Feel free to extend this project by adding features like:
+- Multiple camera support
+- Alert history logging
+- Email/SMS notifications
+- Custom threat detection rules
+
+Happy coding! 🚀
