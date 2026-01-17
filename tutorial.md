@@ -691,6 +691,408 @@ bun run dev
 
 The frontend will start on `http://localhost:3001`. Open this URL in your browser, allow camera access when prompted, and the system will start analyzing your camera feed every 5 seconds for potential threats.
 
+## Frontend Implementation (desktop-app)
+
+Now that we have the web-based frontend working, let's create a native desktop application using **Tauri**. Tauri allows us to build lightweight, secure desktop applications using web technologies while providing native OS integration. This is perfect for a security monitoring application that needs to run reliably in the background.
+
+### Creating the Tauri Project
+
+First, let's create a new Tauri project. Open a terminal in the `intruder alert` folder and run:
+
+```bash
+bun create tauri-app
+```
+
+When prompted, configure the project with these options:
+- **Project name**: `frontend-app` (we'll rename the folder to `frontend-desktop-app`)
+- **Identifier**: Choose your preferred identifier (e.g., `com.intruderalert.app`)
+- **Frontend language**: TypeScript / JavaScript
+- **Package manager**: bun
+- **UI template**: React
+- **UI flavor**: TypeScript
+
+After creation, rename the folder from `frontend-app` to `frontend-desktop-app`:
+
+```bash
+mv frontend-app frontend-desktop-app
+cd frontend-desktop-app
+```
+
+### Installing Dependencies
+
+Navigate to the `frontend-desktop-app` folder and install the base dependencies along with the additional packages we need:
+
+```bash
+cd frontend-desktop-app
+bun install
+bun add axios react-camera-pro
+```
+
+> **Note**: Unlike the web frontend, we won't use `play-pcm` here. Instead, we'll leverage Tauri's native audio capabilities or use the Web Audio API directly.
+
+### Project Structure
+
+Let's set up the proper folder structure. Create the following folders inside `src`:
+- `components`
+- `services`
+
+```bash
+mkdir -p src/components src/services
+```
+
+### Creating the Alert Service
+
+Create a new file `src/services/alert.ts` to handle API communication with the backend:
+
+```typescript
+import axios from "axios";
+
+const API_URL = "http://localhost:3000";
+
+export async function sendAlert(imageData: string) {
+  try {
+    const response = await axios.post(`${API_URL}/alert-system`, {
+      imageBase64: imageData,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error sending alert:", error);
+    throw error;
+  }
+}
+```
+
+This service is identical to our web frontend service since both communicate with the same backend API.
+
+### Creating the CameraFeed Component
+
+Create a new file `src/components/CameraFeed.tsx` with the camera feed and threat detection logic:
+
+```tsx
+import React, { useEffect, useRef } from "react";
+import { Camera, type CameraType } from "react-camera-pro";
+import { sendAlert } from "../services/alert";
+
+export function CameraFeed() {
+  const [loading, setLoading] = React.useState(false);
+  const [audioPCMData, setAudioPCMData] = React.useState<Float32Array | null>(
+    null,
+  );
+  const [threatDescription, setThreatDescription] = React.useState<string>("");
+  const cameraRef = useRef<CameraType>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playAudioFromPCM = (pcmData: Float32Array) => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    const audioContext = audioContextRef.current;
+    const sampleRate = 24000;
+    const audioBuffer = audioContext.createBuffer(1, pcmData.length, sampleRate);
+    audioBuffer.getChannelData(0).set(pcmData);
+    
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = 1.6;
+    source.connect(audioContext.destination);
+    source.start();
+  };
+
+  const handleCapture = async () => {
+    if (cameraRef.current && !loading) {
+      setLoading(true);
+      try {
+        const photo = cameraRef.current.takePhoto();
+        const response = await sendAlert(photo as string);
+        if (response) {
+          if (response.frameDescription?.is_threat) {
+            setThreatDescription(
+              `⚠️ THREAT DETECTED: ${response.frameDescription.description}`,
+            );
+          } else {
+            setThreatDescription("");
+          }
+          if (response.audio) {
+            const audioData = new Float32Array(Object.values(response.audio));
+            setAudioPCMData(audioData);
+          }
+          console.log("Alert response:", response);
+        }
+      } catch (error) {
+        console.error("Error capturing frame:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    const intervalId = setInterval(handleCapture, 5000);
+    return () => clearInterval(intervalId);
+  }, [loading]);
+
+  useEffect(() => {
+    if (audioPCMData) {
+      playAudioFromPCM(audioPCMData);
+    }
+  }, [audioPCMData]);
+
+  return (
+    <div className="camera-container">
+      {loading && (
+        <div className="status-overlay analyzing">
+          <p>🔍 Analyzing frame...</p>
+        </div>
+      )}
+      {threatDescription && (
+        <div className="status-overlay threat">
+          <p>{threatDescription}</p>
+        </div>
+      )}
+      <div className="camera-wrapper">
+        <Camera
+          ref={cameraRef}
+          aspectRatio="cover"
+          errorMessages={{
+            noCameraAccessible:
+              "No camera accessible. Please connect a camera.",
+            permissionDenied:
+              "Camera permission denied. Please allow camera access.",
+            switchCamera: "Cannot switch camera",
+            canvas: "Canvas error",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+The main difference from the web version is that we use the native Web Audio API instead of the `play-pcm` library, which provides better compatibility with Tauri's webview.
+
+### Updating App.tsx
+
+Replace the contents of `src/App.tsx` with our security camera application:
+
+```tsx
+import { CameraFeed } from "./components/CameraFeed";
+import "./App.css";
+
+function App() {
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>🔒 Intruder Alert System</h1>
+        <p>Desktop Security Monitor</p>
+      </header>
+      <main className="app-main">
+        <CameraFeed />
+      </main>
+    </div>
+  );
+}
+
+export default App;
+```
+
+### Styling the Application
+
+Replace the contents of `src/App.css` with styles optimized for the security monitoring interface:
+
+```css
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+
+  color: #f6f6f6;
+  background-color: #1a1a2e;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #0f3460;
+  text-align: center;
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+  color: #e94560;
+}
+
+.app-header p {
+  font-size: 0.875rem;
+  color: #a0a0a0;
+}
+
+.app-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.camera-container {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.camera-wrapper {
+  height: 100%;
+  width: 100%;
+}
+
+.camera-wrapper > div {
+  height: 100% !important;
+}
+
+.status-overlay {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  max-width: calc(100% - 2rem);
+}
+
+.status-overlay.analyzing {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #4a4a4a;
+}
+
+.status-overlay.threat {
+  background: rgba(233, 69, 96, 0.9);
+  border: 1px solid #e94560;
+  top: 4rem;
+}
+
+.status-overlay p {
+  margin: 0;
+  word-wrap: break-word;
+}
+```
+
+### Configuring Tauri for Camera Access
+
+Tauri requires proper permissions for camera access. The default configuration should work, but let's verify the `src-tauri/tauri.conf.json` has the security settings we need:
+
+```json
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Intruder Alert",
+  "version": "0.1.0",
+  "identifier": "com.intruderalert.app",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Intruder Alert - Security Monitor",
+        "width": 1024,
+        "height": 768,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
+```
+
+The key settings here are:
+- `"csp": null` - Disables Content Security Policy to allow camera access and API calls
+- Window size set to `1024x768` for better visibility of the camera feed
+- Updated title to reflect our application name
+
+### Running the Desktop Application
+
+Now we can run the desktop application! Make sure the backend is running first, then:
+
+```bash
+cd frontend-desktop-app
+bun run tauri dev
+```
+
+The first time you run this, Tauri will compile the Rust backend which may take a few minutes. Subsequent runs will be much faster.
+
+You should see a native desktop window open with the camera feed. The application will:
+1. Request camera permission on first launch
+2. Capture frames every 5 seconds
+3. Send frames to the backend for threat analysis
+4. Display threat alerts and play audio warnings when threats are detected
+
+### Building for Production
+
+To create a production build of the desktop application:
+
+```bash
+bun run tauri build
+```
+
+This will create platform-specific installers in `src-tauri/target/release/bundle/`:
+- **macOS**: `.dmg` and `.app` files
+- **Windows**: `.msi` and `.exe` installers
+- **Linux**: `.deb`, `.rpm`, and `.AppImage` files
+
+### Desktop vs Web Frontend Comparison
+
+| Feature | Web Frontend | Desktop App |
+|---------|-------------|-------------|
+| Distribution | Browser URL | Native installer |
+| Camera Access | Browser permissions | OS-level permissions |
+| Audio Playback | `play-pcm` library | Web Audio API |
+| Performance | Browser overhead | Native performance |
+| Offline Capable | No | Yes (with local backend) |
+| System Tray | No | Possible with Tauri |
+
+The desktop application provides a more native experience and can be extended with system tray support, notifications, and auto-start capabilities using Tauri's plugin system.
+
 ## Conclusion
 Congratulations! You've built a complete Security Camera Threat Detection and Alert System using:
 - **Apple's FastVLM-0.5B** for fast and accurate image analysis
